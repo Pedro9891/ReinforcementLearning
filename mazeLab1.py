@@ -76,7 +76,6 @@ class Maze:
                             s += 1;
         return states, map
     def getMinotaur_actions(self, state):
-                ### Get random action from possible minotaur actions.
         # Get possible minotaur actions.
         currentM_row = self.states[state][2];
         currentM_col = self.states[state][3];
