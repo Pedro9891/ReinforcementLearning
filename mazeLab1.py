@@ -35,7 +35,8 @@ class Maze:
     # Reward values
     STEP_REWARD = -1
     GOAL_REWARD = 0
-    IMPOSSIBLE_REWARD = -100
+    IMPOSSIBLE_REWARD = -10000
+    EATEN_REWARD = -1000
 
 
     def __init__(self, maze, weights=None, random_rewards=False):
@@ -64,15 +65,38 @@ class Maze:
         map = dict();
         end = False;
         s = 0;
+        #i,j player position. m,n minotaur position.
         for i in range(self.maze.shape[0]):
             for j in range(self.maze.shape[1]):
-                if self.maze[i,j] != 1:
-                    states[s] = (i,j);
-                    map[(i,j)] = s;
-                    s += 1;
+                for m in range(self.maze.shape[0]):
+                    for n in range(self.maze.shape[1]):
+                        if self.maze[i,j] != 1:
+                            states[s] = (i,j,m,n);
+                            map[(i,j,m,n)] = s;
+                            s += 1;
         return states, map
-
-    def __move(self, state, action):
+    def getMinotaur_actions(self, state):
+                ### Get random action from possible minotaur actions.
+        # Get possible minotaur actions.
+        currentM_row = self.states[state][2];
+        currentM_col = self.states[state][3];
+        #check if minotaur is on the border of the maze
+        border_of_maze =  (currentM_row == 0) or (currentM_row== self.maze.shape[0]-1) or \
+                                (currentM_col == 0) or (currentM_col== self.maze.shape[1]-1)
+        #collect minotaur possible actions and store them in m_possibleActions.
+        m_possibleActions = []
+        if border_of_maze:
+            for m_action in list(self.actions.keys())[1:]:
+                row_m = self.states[state][2] + self.actions[m_action][0]
+                col_m = self.states[state][3] + self.actions[m_action][1]
+                outside_of_maze =  (row_m == -1) or (row_m == self.maze.shape[0]) or \
+                                    (col_m == -1) or (col_m == self.maze.shape[1])
+                if not outside_of_maze:
+                    m_possibleActions.append(m_action)
+        else:
+            m_possibleActions = list(self.actions.keys())[1:]
+        return m_possibleActions
+    def __move(self, state, action, m_action = None):
         """ Makes a step in the maze, given a current position and an action.
             If the action STAY or an inadmissible action is used, the agent stays in place.
 
@@ -82,14 +106,28 @@ class Maze:
         row = self.states[state][0] + self.actions[action][0];
         col = self.states[state][1] + self.actions[action][1];
         # Is the future position an impossible one ?
-        hitting_maze_walls =  (row == -1) or (row == self.maze.shape[0]) or \
-                              (col == -1) or (col == self.maze.shape[1]) or \
-                              (self.maze[row,col] == 1);
+        hitting_maze_walls = (row == -1) or (row == self.maze.shape[0]) or \
+                             (col == -1) or (col == self.maze.shape[1]) or \
+                             (self.maze[row,col] == 1);
+        if m_action != None:
+            row_m = self.states[state][2] + self.actions[m_action][0];
+            col_m = self.states[state][3] + self.actions[m_action][1];
+        else:
+            ### Get random action from possible minotaur actions.
+            # Get possible minotaur actions.
+            m_possibleActions = self.getMinotaur_actions(state)
+
+            # Compute the future position of the minotaur given current state
+            minotaur_action = np.random.choice(m_possibleActions)
+            row_m = self.states[state][2] + self.actions[minotaur_action][0];
+            col_m = self.states[state][3] + self.actions[minotaur_action][1];
+
         # Based on the impossiblity check return the next state.
         if hitting_maze_walls:
-            return state;
+            return self.map[(self.states[state][0], self.states[state][1], row_m, col_m)];
         else:
-            return self.map[(row, col)];
+            return self.map[(row, col, row_m, col_m)];
+
 
     def __transitions(self):
         """ Computes the transition probabilities for every state action pair.
@@ -103,9 +141,13 @@ class Maze:
         # Compute the transition probabilities. Note that the transitions
         # are deterministic.
         for s in range(self.n_states):
-            for a in range(self.n_actions):
-                next_s = self.__move(s,a);
-                transition_probabilities[next_s, s, a] = 1;
+            #current minotaur position
+            m_possibleActions = self.getMinotaur_actions(s)
+
+            for m_action in m_possibleActions:
+                for a in range(self.n_actions):
+                    next_s = self.__move(s,a, m_action);
+                    transition_probabilities[next_s, s, a] = 1/len(m_possibleActions);
         return transition_probabilities;
 
     def __rewards(self, weights=None, random_rewards=None):
@@ -117,11 +159,22 @@ class Maze:
             for s in range(self.n_states):
                 for a in range(self.n_actions):
                     next_s = self.__move(s,a);
+                    get_eaten = False
+                    m_possibleActions = self.getMinotaur_actions(s)
+                    # Check if next player position could get eaten
+                    for m_action in m_possibleActions:
+                        next_Ms = self.__move(s, a, m_action)
+                        if self.states[next_Ms][0:2] == self.states[next_Ms][2:]:
+                            get_eaten = True
+
                     # Rewrd for hitting a wall
-                    if s == next_s and a != self.STAY:
+                    if self.states[s][0:2] == self.states[next_s][0:2] and a != self.STAY:
                         rewards[s,a] = self.IMPOSSIBLE_REWARD;
+                    # Reward for being eaten
+                    elif get_eaten and self.maze[self.states[s][:2]] != 2:
+                        rewards[s,a] = self.EATEN_REWARD/len(m_possibleActions)
                     # Reward for reaching the exit
-                    elif s == next_s and self.maze[self.states[next_s]] == 2:
+                    elif self.states[s][:2] == self.states[next_s][:2] and self.maze[self.states[next_s][:2]] == 2:
                         rewards[s,a] = self.GOAL_REWARD;
                     # Reward for taking a step to an empty cell that is not the exit
                     else:
@@ -346,7 +399,6 @@ def draw_maze(maze):
         cell.set_width(1.0/cols);
 
 def animate_solution(maze, path):
-
     # Map a color to each cell in the maze
     col_map = {0: WHITE, 1: BLACK, 2: LIGHT_GREEN, -6: LIGHT_RED, -1: LIGHT_RED};
 
@@ -384,15 +436,22 @@ def animate_solution(maze, path):
 
     # Update the color at each frame
     for i in range(len(path)):
-        grid.get_celld()[(path[i])].set_facecolor(LIGHT_ORANGE)
-        grid.get_celld()[(path[i])].get_text().set_text('Player')
+
+
+        grid.get_celld()[(path[i][:2])].get_text().set_text('Player')
         if i > 0:
-            if path[i] == path[i-1]:
-                grid.get_celld()[(path[i])].set_facecolor(LIGHT_GREEN)
-                grid.get_celld()[(path[i])].get_text().set_text('Player is out')
+            if path[i][:2] == path[i-1][:2]:
+                grid.get_celld()[(path[i][:2])].set_facecolor(LIGHT_GREEN)
+                grid.get_celld()[(path[i-1][2:])].set_facecolor(col_map[maze[path[i-1][2:]]])
+
+                grid.get_celld()[(path[i][:2])].get_text().set_text('Player is out')
             else:
-                grid.get_celld()[(path[i-1])].set_facecolor(col_map[maze[path[i-1]]])
-                grid.get_celld()[(path[i-1])].get_text().set_text('')
+                grid.get_celld()[(path[i-1][2:])].set_facecolor(col_map[maze[path[i-1][2:]]])
+                grid.get_celld()[(path[i-1][:2])].set_facecolor(col_map[maze[path[i-1][:2]]])
+
+                grid.get_celld()[(path[i-1][:2])].get_text().set_text('')
+        grid.get_celld()[(path[i][:2])].set_facecolor(LIGHT_ORANGE)
+        grid.get_celld()[(path[i][2:])].set_facecolor(LIGHT_PURPLE)
         display.display(fig)
         display.clear_output(wait=True)
         time.sleep(1)
