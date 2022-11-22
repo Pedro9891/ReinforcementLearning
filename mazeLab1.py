@@ -5,7 +5,7 @@ from IPython import display
 
 # Implemented methods
 methods = ['DynProg', 'ValIter'];
-
+P_poison = 1/30
 # Some colours
 LIGHT_RED    = '#FFC4CC';
 LIGHT_GREEN  = '#95FD99';
@@ -95,15 +95,21 @@ class Maze:
         else:
             m_possibleActions = list(self.actions.keys())[1:]
         return m_possibleActions
-    def __move(self, state, action, m_action = None):
+    def __move(self, state, action, m_action = None, p_poison=None):
         """ Makes a step in the maze, given a current position and an action.
             If the action STAY or an inadmissible action is used, the agent stays in place.
 
             :return tuple next_cell: Position (x,y) on the maze that agent transitions to.
         """
+        if p_poison != None:
+            if np.random.rand() < p_poison:
+                return self.n_states
+
         # Compute the future position given current (state, action)
         row = self.states[state][0] + self.actions[action][0];
         col = self.states[state][1] + self.actions[action][1];
+        if row == col == -1:
+            return state
         # Is the future position an impossible one ?
         hitting_maze_walls = (row == -1) or (row == self.maze.shape[0]) or \
                              (col == -1) or (col == self.maze.shape[1]) or \
@@ -224,26 +230,28 @@ class Maze:
                 s = next_s;
         if method == 'ValIter':
             # Initialize current state, next state and time
+            self.states[self.n_states] = (-1, -1, -1, -1)
             t = 1;
             s = self.map[start];
             # Add the starting position in the maze to the path
             path.append(start);
             # Move to next state given the policy and the current state
-            next_s = self.__move(s,policy[s]);
+            next_s = self.__move(s,policy[s], p_poison=P_poison);
             # Add the position in the maze corresponding to the next state
             # to the path
             path.append(self.states[next_s]);
             # Loop while state is not the goal state
-            while s != next_s:
+            while t < 200 and self.maze[self.states[s][0], self.states[s][1]]!=2 and next_s < self.n_states:
                 # Update state
-                s = next_s;
+                s = next_s
                 # Move to next state given the policy and the current state
-                next_s = self.__move(s,policy[s]);
+                next_s = self.__move(s,policy[s], p_poison=P_poison);
                 # Add the position in the maze corresponding to the next state
                 # to the path
                 path.append(self.states[next_s])
+
                 # Update time and state for next iteration
-                t +=1;
+                t +=1
         return path
 
 
@@ -321,11 +329,37 @@ def value_iteration(env, gamma, epsilon):
     # - State space
     # - Action space
     # - The finite horizon
-    p         = env.transition_probabilities;
-    r         = env.rewards;
-    n_states  = env.n_states;
-    n_actions = env.n_actions;
+    states = np.array(list(env.map.keys())+[(-1, -1, -1, -1)])
+    poison_p = P_poison
+    n_states = states.shape[0]
+    n_actions = env.n_actions
+    p = np.zeros((n_states, n_states, n_actions))
+    # terminal_states = []
+    # for state in states[:-1]:
+    #     if env.maze[state[0], state[1]] == 2:
+    #         terminal_states.append(state)
+    # terminal_states = [env.map[tuple(s.tolist())] for s in terminal_states]
 
+    p[:-1, :-1] = env.transition_probabilities * (1-poison_p)
+    p[-1,:, :] = poison_p
+
+    r = np.ones([n_states, n_actions]) * -1
+    r[:-1, :] = env.rewards
+    r[-1, :] = -100 #Death reward
+    for state in range(n_states):
+        if state == n_states-1:
+            r[state, :] = -100 # we die
+            p[:, state, :] = 0 #end of the game
+            continue
+        i, j, m, n = env.states[state]
+        if env.maze[i][j] == 2:
+            r[state, :] = 0 # finishing
+            p[:, state, :] = 0 # end of the game
+        elif i == m and j == n: 
+            r[state, :] = -100 # we are eaten
+            p[:, state, :] = 0 # end of the game
+   
+    
     # Required variables and temporary ones for the VI to run
     V   = np.zeros(n_states);
     Q   = np.zeros((n_states, n_actions));
@@ -342,7 +376,7 @@ def value_iteration(env, gamma, epsilon):
     BV = np.max(Q, 1);
 
     # Iterate until convergence
-    while np.linalg.norm(V - BV) >= tol and n < 200:
+    while np.linalg.norm(V - BV) >= tol and n < 20:
         # Increment by one the numbers of iteration
         n += 1;
         # Update the value function
@@ -353,12 +387,13 @@ def value_iteration(env, gamma, epsilon):
                 Q[s, a] = r[s, a] + gamma*np.dot(p[:,s,a],V);
         BV = np.max(Q, 1);
         # Show error
-        #print(np.linalg.norm(V - BV))
+        # print(n, np.linalg.norm(V - BV))
 
     # Compute policy
     policy = np.argmax(Q,1);
     # Return the obtained policy
     return V, policy;
+  
 
 def draw_maze(maze):
 
@@ -436,7 +471,12 @@ def animate_solution(maze, path):
     # Update the color at each frame
     for i in range(len(path)):
 
-
+        if path[i] == (-1, -1, -1, -1):
+            grid.get_celld()[(path[i-1][:2])].get_text().set_text('Player')
+            grid.get_celld()[(path[i-1][:2])].set_facecolor(LIGHT_RED)
+            grid.get_celld()[(path[i-1][2:])].set_facecolor(col_map[maze[path[i-1][2:]]])
+            grid.get_celld()[(path[i-1][:2])].get_text().set_text('Player is dead')
+            break
         grid.get_celld()[(path[i][:2])].get_text().set_text('Player')
         if i > 0:
             if path[i][:2] == path[i-1][:2]:
@@ -454,3 +494,5 @@ def animate_solution(maze, path):
         display.display(fig)
         display.clear_output(wait=True)
         time.sleep(1)
+
+
