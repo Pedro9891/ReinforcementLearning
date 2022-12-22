@@ -15,6 +15,26 @@
 
 # Load packages
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+class MyNetwork(nn.Module):
+    def __init__(self, input_size, output_size):
+        super().__init__()
+
+        self.input_layer = nn.Linear(input_size, 32)
+        self.input_layer_activation = nn.ReLU()
+
+        self.output_layer = nn.Linear(32, output_size)
+
+    def forward(self, x):
+
+        l1 = self.input_layer(x)
+        l1 = self.input_layer_activation(l1)
+        out = self.output_layer(l1)
+
+        return out
 
 class Agent(object):
     ''' Base agent class, used as a parent class
@@ -29,14 +49,43 @@ class Agent(object):
     def __init__(self, n_actions: int):
         self.n_actions = n_actions
         self.last_action = None
+        self.mNetwork = MyNetwork(8, n_actions) #number of states  = 8
+        self.tNetwork = MyNetwork(8, n_actions)
+        self.tNetwork.load_state_dict(self.mNetwork.state_dict())
 
-    def forward(self, state: np.ndarray):
+        self.optimizer = optim.Adam(self.mNetwork.parameters(), lr= 0.0001)
+
+    def forward(self, state: np.ndarray, eps_k):
         ''' Performs a forward computation '''
-        pass
+        out = self.mNetwork(state)
 
-    def backward(self):
+        #take epsilon greedy action
+        if np.random.uniform(0, 1) > eps_k:
+            action = out.max(1)[1].item()
+        else:
+            action = np.random.randint(0, self.n_actions)
+
+        return action
+        #pass
+
+    def backward(self, states, actions, target_states,N):
         ''' Performs a backward pass on the network '''
-        pass
+        self.optimizer.zero_grad()
+        #states, actions, rewards, next_states, dones = buffer.sample_batch(3)
+        Q_values = self.mNetwork(torch.tensor(np.array(states), requires_grad=True, dtype=torch.float32))
+        Q_tensor = torch.zeros(64, requires_grad=False,dtype=torch.float32)
+
+        #Get Q(s_i, a_i)
+        for i in range(N):
+            Q_tensor[i] = Q_values[i,actions[i]]
+
+        target_values = torch.tensor(target_states, requires_grad=True, dtype=torch.float32)
+
+
+        loss = nn.functional.mse_loss(Q_tensor, target_values)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.mNetwork.parameters(), 1)
+        self.optimizer.step()
 
 
 class RandomAgent(Agent):
