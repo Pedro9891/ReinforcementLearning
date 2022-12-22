@@ -58,7 +58,7 @@ def running_average(x, N):
 # Import and initialize the discrete Lunar Laner Environment
 env = gym.make('LunarLander-v2')
 env.reset()
-
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # Parameters
 N_episodes = 300                             # Number of episodes
 discount_factor = 0.95                       # Value of the discount factor
@@ -72,7 +72,7 @@ episode_reward_list = []       # this list contains the total reward per episode
 episode_number_of_steps = []   # this list contains the number of steps per episode
 
 # Random agent initialization
-agent = Agent(n_actions)
+agent = Agent(n_actions).to(device)
 
 # Create buffer
 buffer_size = 20000
@@ -93,16 +93,16 @@ EPISODES = trange(N_episodes, desc='Episode: ', leave=True)
 for nr,i in enumerate(EPISODES):
     # Reset enviroment data and initialize variables
     done = False
-    state = env.reset()
+    state, _ = env.reset()
     total_episode_reward = 0.
     t = 0
     while not done:
         eps_k = max(eps_min, eps_max - (eps_max - eps_min)*(nr - 1)/(N_episodes*0.95 - 1))
-
+        
         # Create state tensor, remember to use single precision (torch.float32)
         state_tensor = torch.tensor(np.array([state]),
                                     requires_grad=False,
-                                    dtype=torch.float32)
+                                    dtype=torch.float32).to(device)
 
         # Take a random action
         action = agent.forward(state_tensor, eps_k)
@@ -110,7 +110,8 @@ for nr,i in enumerate(EPISODES):
         # Get next state and reward.  The done variable
         # will be True if you reached the goal position,
         # False otherwise
-        next_state, reward, done, _ = env.step(action)
+        # print(len(env.step(action)))
+        next_state, reward, done, _, _ = env.step(action)
 
 
 
@@ -128,7 +129,7 @@ for nr,i in enumerate(EPISODES):
                 if not dones[j]:
                     next_state_tensor = torch.tensor(np.array([next_states[j]]),
                                                 requires_grad=False,
-                                                dtype=torch.float32)
+                                                dtype=torch.float32).to(device)
                     out = agent.tNetwork(next_state_tensor)
                     max_aQ = torch.max(out)
                     y[j] = rewards[j] + gamma * max_aQ

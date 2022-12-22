@@ -18,6 +18,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class MyNetwork(nn.Module):
     def __init__(self, input_size, output_size):
@@ -36,7 +37,7 @@ class MyNetwork(nn.Module):
 
         return out
 
-class Agent(object):
+class Agent(nn.Module):
     ''' Base agent class, used as a parent class
 
         Args:
@@ -47,6 +48,7 @@ class Agent(object):
             last_action (int): last action taken by the agent
     '''
     def __init__(self, n_actions: int):
+        super().__init__()
         self.n_actions = n_actions
         self.last_action = None
         self.mNetwork = MyNetwork(8, n_actions) #number of states  = 8
@@ -72,14 +74,14 @@ class Agent(object):
         ''' Performs a backward pass on the network '''
         self.optimizer.zero_grad()
         #states, actions, rewards, next_states, dones = buffer.sample_batch(3)
-        Q_values = self.mNetwork(torch.tensor(np.array(states), requires_grad=True, dtype=torch.float32))
-        Q_tensor = torch.zeros(64, requires_grad=False,dtype=torch.float32)
+        Q_values = self.mNetwork(torch.tensor(np.array(states), requires_grad=True, dtype=torch.float32).to(device))
+        Q_tensor = torch.zeros(64, requires_grad=False,dtype=torch.float32).to(device)
 
         #Get Q(s_i, a_i)
         for i in range(N):
             Q_tensor[i] = Q_values[i,actions[i]]
 
-        target_values = torch.tensor(target_states, requires_grad=True, dtype=torch.float32)
+        target_values = torch.tensor(target_states, requires_grad=True, dtype=torch.float32).to(device)
 
 
         loss = nn.functional.mse_loss(Q_tensor, target_values)
