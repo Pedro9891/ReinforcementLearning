@@ -17,7 +17,7 @@ import torch.nn as nn
 
 def soft_updates(network: nn.Module,
                  target_network: nn.Module,
-                 tau: float) -> nn.Module:
+                 tau=1e-3) -> nn.Module:
     """ Performs a soft copy of the network's parameters to the target
         network's parameter
 

@@ -18,7 +18,7 @@ import numpy as np
 import gym
 import torch
 from tqdm import trange
-
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 def running_average(x, N):
     ''' Function used to compute the running average
         of the last N elements of a vector x
@@ -32,7 +32,9 @@ def running_average(x, N):
 
 # Load model
 try:
-    model = torch.load('neural-network-1.pth')
+    # model = torch.load('neural-network-1.pth')
+    model = torch.load('/home/ali/reinforce/ReinforcementLearning/Lab2/problem1/saves/model_ep_1000_gam_0.98_buffer_20000_batch_128_step/neural-network-1.pth')
+    # model = model.theta_network
     print('Network model: {}'.format(model))
 except:
     print('File neural-network-1.pth not found!')
@@ -56,16 +58,17 @@ for i in EPISODES:
     EPISODES.set_description("Episode {}".format(i))
     # Reset enviroment data
     done = False
-    state = env.reset()
+    state, _ = env.reset()
     total_episode_reward = 0.
     while not done:
         # Get next state and reward.  The done variable
         # will be True if you reached the goal position,
         # False otherwise
-        q_values = model(torch.tensor([state]))
+        q_values = model(torch.tensor([state]).to(device))
         _, action = torch.max(q_values, axis=1)
-        next_state, reward, done, _ = env.step(action.item())
-
+        # next_state, reward, done, _ = env.step(action.item())
+        next_state, reward, terminated, truncated, _ = env.step(action.item())
+        done = terminated or truncated
         # Update episode reward
         total_episode_reward += reward
 
