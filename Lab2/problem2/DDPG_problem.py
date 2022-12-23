@@ -22,8 +22,8 @@ from tqdm import trange
 from DDPG_agent import RandomAgent, Agent
 from collections import deque
 import numpy as np
-torch.manual_seed(32)
-np.random.seed(32)
+# torch.manual_seed(32)
+# np.random.seed(32)
 torch.manual_seed(21)
 np.random.seed(21)
 import argparse
@@ -74,7 +74,7 @@ env = gym.make('LunarLanderContinuous-v2')
 env.reset()
 
 # Parameters
-N_episodes = 800               # Number of episodes to run for training
+N_episodes = 700               # Number of episodes to run for training
 discount_factor = args.gamma        # Value of gamma
 n_ep_running_average = 50      # Running average of 50 episodes
 m = len(env.action_space.high) # dimensionality of the action
@@ -84,7 +84,7 @@ N = 64
 d = 2
 sigma=0.2
 mu=0.15
-save_dir = os.path.join(f'./saves2/gamma_{args.gamma}_buffer_{args.buffer}_eps_{N_episodes}_to400_25')
+save_dir = os.path.join(f'./saves2/gamma_{args.gamma}_buffer_{args.buffer}_eps_{N_episodes}_big_net')
 if not os.path.exists(save_dir): os.makedirs(save_dir)
 plot_every=10
 # Reward
@@ -104,10 +104,10 @@ for i in EPISODES:
     total_episode_reward = 0.
     t = 0
     n = 0
-    if i < 400:
-        sigma=0.25
-    else:
-        sigma=0.2
+    # if i < 400:
+    #     sigma=0.25
+    # else:
+    #     sigma=0.2
     while not done:
         # Take a random action
         state_tensor = torch.tensor(np.array([state]),

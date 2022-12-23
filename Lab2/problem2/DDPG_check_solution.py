@@ -33,7 +33,7 @@ def running_average(x, N):
 
 # Load model
 try:
-    model = torch.load('neural-network-2-actor.pth')
+    model = torch.load('/home/ali/reinforce/ReinforcementLearning/Lab2/problem2/saves2/gamma_0.98_buffer_30000_eps_800_big_net/neural-network-2-actor.pth')
     print('Network model: {}'.format(model))
 except:
     print('File neural-network-2-actor.pth not found!')
@@ -49,7 +49,7 @@ CONFIDENCE_PASS = 125
 
 # Reward
 episode_reward_list = []  # Used to store episodes reward
-
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # Simulate episodes
 print('Checking solution...')
 EPISODES = trange(N_EPISODES, desc='Episode: ', leave=True)
@@ -57,15 +57,16 @@ for i in EPISODES:
     EPISODES.set_description("Episode {}".format(i))
     # Reset enviroment data
     done = False
-    state = env.reset()
+    state, _ = env.reset()
     total_episode_reward = 0.
     while not done:
         # Get next state and reward.  The done variable
         # will be True if you reached the goal position,
         # False otherwise
-        action = model(torch.tensor([state]))[0]
-        next_state, reward, done, _ = env.step(action.detach().numpy())
-
+        action = model(torch.tensor([state]).to(device))[0]
+        
+        next_state, reward, terminated, truncated, _ = env.step(action.detach().cpu().numpy())
+        done = terminated or truncated
         # Update episode reward
         total_episode_reward += reward
 

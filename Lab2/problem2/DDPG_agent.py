@@ -27,6 +27,8 @@ class CriticNet(nn.Module):
         self.input_layer = nn.Sequential(nn.Linear(state_dim, 400), nn.ReLU())
         self.model = nn.Sequential(nn.Linear(400+n_actions, 200),
                                    nn.ReLU(),
+                                   nn.Linear(200, 200),
+                                   nn.ReLU(),
                                    nn.Linear(200, 1))
     def forward(self, state, action):
         encode = self.input_layer(state)
@@ -51,6 +53,8 @@ class Agent(object):
             nn.ReLU(),
             nn.Linear(400, 200),
             nn.ReLU(),
+            nn.Linear(200, 200),
+            nn.ReLU(),
             nn.Linear(200, self.n_actions),
             nn.Tanh()
         ).to(device)
@@ -58,6 +62,8 @@ class Agent(object):
             nn.Linear(self.state_dim, 400),
             nn.ReLU(),
             nn.Linear(400, 200),
+            nn.ReLU(),
+            nn.Linear(200, 200),
             nn.ReLU(),
             nn.Linear(200, self.n_actions),
             nn.Tanh()
