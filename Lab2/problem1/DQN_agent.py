@@ -103,5 +103,6 @@ class RandomAgent(Agent):
             Returns:
                 action (int): the random action
         '''
-        self.last_action = np.random.randint(0, self.n_actions)
+        self.last_action = torch.tensor(np.random.randint(0, self.n_actions))
+        return torch.rand([1, self.n_actions])
         return self.last_action

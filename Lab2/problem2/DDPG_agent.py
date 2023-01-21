@@ -117,7 +117,7 @@ class Agent(object):
 class RandomAgent(Agent):
     ''' Agent taking actions uniformly at random, child of the class Agent'''
     def __init__(self, n_actions: int):
-        super(RandomAgent, self).__init__(n_actions)
+        super(RandomAgent, self).__init__(n_actions, -1)
 
     def forward(self, state: np.ndarray) -> np.ndarray:
         ''' Compute a random action in [-1, 1]
@@ -127,4 +127,6 @@ class RandomAgent(Agent):
                     action. The dimensionality is equal to self.n_actions from
                     the parent class Agent.
         '''
-        return np.clip(-1 + 2 * np.random.rand(self.n_actions), -1, 1)
+        # print(np.random.rand(self.n_actions) * 2 - 1)
+        return  np.random.rand(self.n_actions) * 2 - 1
+        # return np.clip(-1 + 2 * np.random.rand(self.n_actions), -1, 1)

@@ -19,7 +19,8 @@ import numpy as np
 import gym
 import torch
 from tqdm import trange
-
+from DDPG_agent import RandomAgent
+random_agent = True
 def running_average(x, N):
     ''' Function used to compute the running average
         of the last N elements of a vector x
@@ -30,10 +31,10 @@ def running_average(x, N):
     else:
         y = np.zeros_like(x)
     return y
-
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # Load model
 try:
-    model = torch.load('/home/ali/reinforce/ReinforcementLearning/Lab2/problem2/saves2/gamma_0.98_buffer_30000_eps_800_big_net/neural-network-2-actor.pth')
+    model = torch.load('/home/ali/reinforce/ReinforcementLearning/Lab2/problem2/saves2/gamma_0.98_buffer_30000_eps_800_big_net/neural-network-2-actor.pth', map_location=device)
     print('Network model: {}'.format(model))
 except:
     print('File neural-network-2-actor.pth not found!')
@@ -42,6 +43,7 @@ except:
 # Import and initialize Mountain Car Environment
 env = gym.make('LunarLanderContinuous-v2')
 env.reset()
+if random_agent: model = RandomAgent(len(env.action_space.high))
 
 # Parameters
 N_EPISODES = 50            # Number of episodes to run for trainings
@@ -63,9 +65,10 @@ for i in EPISODES:
         # Get next state and reward.  The done variable
         # will be True if you reached the goal position,
         # False otherwise
-        action = model(torch.tensor([state]).to(device))[0]
-        
-        next_state, reward, terminated, truncated, _ = env.step(action.detach().cpu().numpy())
+        action = model.forward(torch.tensor([state]).to(device))
+        # print(action)
+        # assert False
+        next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
         # Update episode reward
         total_episode_reward += reward
@@ -91,3 +94,18 @@ if avg_reward - confidence >= CONFIDENCE_PASS:
     print('Your policy passed the test!')
 else:
     print("Your policy did not pass the test! The average reward of your policy needs to be greater than {} with 95% confidence".format(CONFIDENCE_PASS))
+
+
+import matplotlib.pyplot as plt
+
+sums = []
+t =  0
+for r in episode_reward_list:
+    t += r
+    sums.append(t)
+plt.plot(sums)
+plt.title(f'Sum of Episodic Reward on {"Random" if random_agent else "trained"} Agent!')
+plt.xlabel('Episode')
+plt.ylabel('Aggregated reward')
+plt.savefig(f'aggr_random_{random_agent}.png')
+plt.close()
